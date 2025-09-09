@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Investigación de Productos Amazon</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; background: #f8f9fa; }
+    h1 { text-align: center; color: #333; }
+    nav { margin-bottom: 20px; text-align: center; }
+    nav button { margin: 5px; padding: 10px 20px; border: none; border-radius: 5px; background: #007bff; color: white; cursor: pointer; }
+    nav button:hover { background: #0056b3; }
+    section { display: none; }
+    section.active { display: block; }
+    table { border-collapse: collapse; width: 100%; margin-top: 10px; background: white; }
+    th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
+    th { background: #e9ecef; font-weight: bold; }
+    tr:nth-child(even) { background: #f2f2f2; }
+    .kpi { display: inline-block; margin: 20px; padding: 20px; background: #fff; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+    .kpi h2 { margin: 0; font-size: 24px; }
+  </style>
+</head>
+<body>
+  <h1>Investigación de Mercado - Amazon</h1>
+
+  <nav>
+    <button onclick="showTab('atributos')">Atributos de Productos</button>
+    <button onclick="showTab('investigacion')">Investigación de Productos</button>
+    <button onclick="showTab('dashboard')">Dashboard Gerencial</button>
+  </nav>
+
+  <!-- Hoja 1 -->
+  <section id="atributos" class="active">
+    <h2><b>Atributos de Productos</b></h2>
+    <input type="file" id="fileAtributos" accept=".xlsx" />
+    <div id="tablaAtributos"></div>
+  </section>
+
+  <!-- Hoja 2 -->
+  <section id="investigacion">
+    <h2><b>Investigación de Productos</b></h2>
+    <input type="file" id="fileInvestigacion" accept=".xlsx" />
+    <div id="tablaInvestigacion"></div>
+  </section>
+
+  <!-- Hoja 3 -->
+  <section id="dashboard">
+    <h2><b>Dashboard Gerencial</b></h2>
+    <div class="kpi"><h2 id="precioPromedio">-</h2><p>Precio Promedio</p></div>
+    <div class="kpi"><h2 id="volumenBusqueda">-</h2><p>Volumen de Búsquedas</p></div>
+    <div class="kpi"><h2 id="numProductos">-</h2><p>Número de Productos</p></div>
+    <canvas id="grafico" width="400" height="200"></canvas>
+  </section>
+
+  <script>
+    function showTab(tabId) {
+      document.querySelectorAll("section").forEach(sec => sec.classList.remove("active"));
+      document.getElementById(tabId).classList.add("active");
+    }
+
+    // Leer Excel y mostrar en tabla
+    function handleFile(inputId, outputId) {
+      const input = document.getElementById(inputId);
+      input.addEventListener("change", (e) => {
+        const file = e.target.files[0];
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+          const data = new Uint8Array(evt.target.result);
+          const workbook = XLSX.read(data, { type: "array" });
+          const sheet = workbook.Sheets[workbook.SheetNames[0]];
+          const json = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+          renderTable(json, outputId);
+          if (outputId === "tablaInvestigacion") calcularDashboard(json);
+        };
+        reader.readAsArrayBuffer(file);
+      });
+    }
+
+    function renderTable(data, outputId) {
+      let html = "<table><thead><tr>";
+      data[0].forEach(col => { html += `<th>${col}</th>`; });
+      html += "</tr></thead><tbody>";
+      for (let i = 1; i < data.length && i <= 100; i++) {
+        html += "<tr>";
+        data[i].forEach(cell => { html += `<td contenteditable='true'>${cell || ""}</td>`; });
+        html += "</tr>";
+      }
+      html += "</tbody></table>";
+      document.getElementById(outputId).innerHTML = html;
+    }
+
+    // Dashboard con cálculos básicos
+    function calcularDashboard(data) {
+      let precios = [];
+      let volumenes = [];
+      for (let i = 1; i < data.length; i++) {
+        let precio = parseFloat(data[i][2]); // Ejemplo: columna 3 = precio
+        let volumen = parseInt(data[i][3]);  // Ejemplo: columna 4 = volumen búsquedas
+        if (!isNaN(precio)) precios.push(precio);
+        if (!isNaN(volumen)) volumenes.push(volumen);
+      }
+      const avgPrecio = precios.reduce((a,b) => a+b, 0) / precios.length || 0;
+      const avgVolumen = volumenes.reduce((a,b) => a+b, 0) / volumenes.length || 0;
+
+      document.getElementById("precioPromedio").innerText = "$" + avgPrecio.toFixed(2);
+      document.getElementById("volumenBusqueda").innerText = avgVolumen.toFixed(0);
+      document.getElementById("numProductos").innerText = data.length - 1;
+
+      new Chart(document.getElementById("grafico"), {
+        type: "bar",
+        data: {
+          labels: precios.map((_,i) => "Prod " + (i+1)),
+          datasets: [
+            { label: "Precio", data: precios },
+            { label: "Volumen", data: volumenes }
+          ]
+        }
+      });
+    }
+
+    // Inicializar
+    handleFile("fileAtributos", "tablaAtributos");
+    handleFile("fileInvestigacion", "tablaInvestigacion");
+  </script>
+</body>
+</html>
